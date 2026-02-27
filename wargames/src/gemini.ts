@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Agent } from "./agents";
+import type { Agent } from "./agents";
 
 const keys = [
   import.meta.env.VITE_GEMINI_API_KEY,

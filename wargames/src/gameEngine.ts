@@ -1,4 +1,4 @@
-import { Agent } from "./agents";
+import type { Agent } from "./agents";
 import { getAgentMove, RoundHistory } from "./gemini";
 
 export const WIN_SCORE = 50;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { agents as initialAgents } from './agents'
+import type {Agent} from "./agents"
 import { initGameState, runRound, GameState, WIN_SCORE } from './gameEngine'
 
 // ---------------------------------------------------------------------------
@@ -7,15 +8,6 @@ import { initGameState, runRound, GameState, WIN_SCORE } from './gameEngine'
 // ---------------------------------------------------------------------------
 
 type Move = 'Cooperate' | 'Defect'
-
-interface Agent {
-  id: string
-  name: string
-  color: string
-  score: number
-  lastMove: Move | null
-  reasoning: string
-}
 
 interface HistoryEntry {
   round: number
@@ -216,7 +208,6 @@ function AgentCard({ agent, isThinking }: { agent: Agent; isThinking: boolean })
         <span className="text-lg font-bold" style={{ color: P.bright }}>{agent.score}</span>
       </div>
 
-      {/* Score progress to win */}
       <div className="rounded-full h-1 overflow-hidden" style={{ background: 'rgba(240,233,210,0.1)' }}>
         <div className="h-full rounded-full transition-all duration-500"
           style={{ width: `${Math.min((agent.score / WIN_SCORE) * 100, 100)}%`, backgroundColor: agent.color }} />
@@ -406,12 +397,12 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
 
   const restart = () => {
     setRunning(false)
+    setIsThinking(false)
     setGameState(initGameState(initialAgents))
   }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
-      {/* Header */}
       <header className="px-6 py-3.5 flex items-center gap-4 shrink-0"
         style={{ background: P.navy }}>
         <button onClick={onBack} className="text-sm transition-colors"
@@ -434,7 +425,6 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
             Round <span className="font-semibold" style={{ color: 'rgba(240,233,210,0.7)' }}>{gameState.round}</span>
           </span>
 
-          {/* Restart */}
           <button onClick={restart}
             className="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150"
             style={{ background: 'rgba(240,233,210,0.08)', color: 'rgba(240,233,210,0.5)' }}
@@ -445,7 +435,6 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
             </svg>
           </button>
 
-          {/* Step */}
           <button
             onClick={stepRound}
             disabled={running || isThinking || !!gameState.winner}
@@ -453,13 +442,12 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
             style={{
               background: (running || isThinking) ? 'rgba(240,233,210,0.05)' : 'rgba(240,233,210,0.1)',
               color: (running || isThinking) ? 'rgba(240,233,210,0.2)' : P.bright,
-              cursor: (running || isThinking) ? 'not-allowed' : 'pointer',
+              cursor: (running || isThinking || !!gameState.winner) ? 'not-allowed' : 'pointer',
             }}
             title="Step one round">
             <StepIcon />
           </button>
 
-          {/* Play / Pause */}
           <button
             onClick={() => setRunning(r => !r)}
             disabled={!!gameState.winner}
@@ -478,7 +466,6 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-6 py-5 flex flex-col gap-4">
 
-          {/* Winner banner */}
           {gameState.winner && (
             <div className="rounded-xl p-4 text-center"
               style={{ background: gameState.winner.color, boxShadow: `0 0 24px ${gameState.winner.color}66` }}>
@@ -491,17 +478,13 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
             </div>
           )}
 
-          {/* Main layout: agent tiles + transmissions */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-
-            {/* Agent tiles 2x2 (or 3x2 for 5) */}
             <div className="lg:col-span-3 grid grid-cols-2 gap-3 content-start">
               {gameState.agents.map(agent => (
                 <AgentCard key={agent.id} agent={agent} isThinking={isThinking} />
               ))}
             </div>
 
-            {/* Transmissions chat feed */}
             <div className="lg:col-span-2 rounded-xl p-4 flex flex-col"
               style={{
                 background: 'rgba(24,29,49,0.6)',
@@ -513,10 +496,8 @@ function PrisonersDilemmaScreen({ onBack }: { onBack: () => void }) {
             </div>
           </div>
 
-          {/* Scoreboard */}
           <Scoreboard agents={sorted} />
 
-          {/* History */}
           <div className="rounded-xl p-4 h-56 flex flex-col" style={{ background: P.cream }}>
             <MoveHistoryPanel history={historyEntries} agents={gameState.agents} />
           </div>
