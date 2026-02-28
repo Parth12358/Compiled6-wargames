@@ -1,82 +1,78 @@
-import type { Agent } from "./agents";
-import { getAgentMove, RoundHistory } from "./gemini";
+import type { Agent } from './agents'
+import { getAgentMove } from './llm.ts'
+import type { RoundHistory } from './llm.ts'
 
-export const WIN_SCORE = 50;
+export const LOSE_SCORE = -50
 
 export interface GameState {
-  agents: Agent[];
-  history: RoundHistory[];
-  round: number;
-  isRunning: boolean;
-  winner: Agent | null;
+  agents: Agent[]
+  eliminated: string[]
+  history: RoundHistory[]
+  round: number
+  isRunning: boolean
+  winner: Agent | null
 }
 
-const calcPoints = (move: "Cooperate" | "Defect", opponentMoves: ("Cooperate" | "Defect")[]): number => {
-  const defectors = opponentMoves.filter((m) => m === "Defect").length;
-  const cooperators = opponentMoves.filter((m) => m === "Cooperate").length;
-
-  if (move === "Cooperate") {
-    return cooperators * 3 - defectors * 5;
-  } else {
-    return cooperators * 5 - defectors * 1;
-  }
-};
-
-export const checkWinner = (agents: Agent[]): Agent | null => {
-  return agents.find(a => a.score >= WIN_SCORE) ?? null;
-};
+const calcPoints = (move: 'Cooperate' | 'Defect', opponentMoves: ('Cooperate' | 'Defect')[]): number => {
+  const defectors = opponentMoves.filter(m => m === 'Defect').length
+  const cooperators = opponentMoves.filter(m => m === 'Cooperate').length
+  if (move === 'Cooperate') return cooperators * 3 - defectors * 2
+  else return cooperators * 5 - defectors * 4
+}
 
 export const runRound = async (
   state: GameState,
   onUpdate: (state: GameState) => void
 ): Promise<GameState> => {
-  const { agents, history, round } = state;
+  const { agents, eliminated, history, round } = state
+
+  const activeAgents = agents.filter(a => !eliminated.includes(a.id))
 
   const results = await Promise.all(
-    agents.map((agent) => getAgentMove(agent, agents, history))
-  );
+    activeAgents.map(agent => getAgentMove(agent, activeAgents, history))
+  )
 
-  const roundMoves: RoundHistory["moves"] = agents.map((agent, i) => ({
-    agentId: agent.id,
-    move: results[i].move,
-  }));
+  const roundMoves = activeAgents.map((agent, i) => ({ agentId: agent.id, move: results[i].move }))
 
-  const updatedAgents: Agent[] = agents.map((agent, i) => {
-    const myMove = results[i].move;
-    const opponentMoves = results
-      .filter((_, j) => j !== i)
-      .map(r => r.move);
+  const updatedAgents: Agent[] = agents.map(agent => {
+    if (eliminated.includes(agent.id)) return agent
+    const i = activeAgents.findIndex(a => a.id === agent.id)
+    const myMove = results[i].move
+    const opponentMoves = results.filter((_, j) => j !== i).map(r => r.move)
+    const points = calcPoints(myMove, opponentMoves)
+    return { ...agent, lastMove: myMove, reasoning: results[i].reasoning, score: agent.score + points }
+  })
 
-    const points = calcPoints(myMove, opponentMoves);
+  // Check new eliminations
+  const newlyEliminated = updatedAgents
+    .filter(a => !eliminated.includes(a.id) && a.score <= LOSE_SCORE)
+    .map(a => a.id)
+  const allEliminated = [...eliminated, ...newlyEliminated]
 
-    return {
-      ...agent,
-      lastMove: myMove,
-      reasoning: results[i].reasoning,
-      score: agent.score + points,
-    };
-  });
+  // Last agent standing wins
+  const stillActive = updatedAgents.filter(a => !allEliminated.includes(a.id))
+  const lastStanding = stillActive.length === 1 ? stillActive[0] : null
 
-  const winner = checkWinner(updatedAgents);
-
-  const newHistory: RoundHistory = { round, moves: roundMoves };
+  const winner = lastStanding
 
   const newState: GameState = {
     agents: updatedAgents,
-    history: [...history, newHistory],
+    eliminated: allEliminated,
+    history: [...history, { round, moves: roundMoves }],
     round: round + 1,
     isRunning: state.isRunning,
-    winner: winner ?? null,
-  };
+    winner,
+  }
 
-  onUpdate(newState);
-  return newState;
-};
+  onUpdate(newState)
+  return newState
+}
 
 export const initGameState = (agents: Agent[]): GameState => ({
-  agents: agents.map((a) => ({ ...a, score: 0, lastMove: null, reasoning: "" })),
+  agents: agents.map(a => ({ ...a, score: 0, lastMove: null, reasoning: '' })),
+  eliminated: [],
   history: [],
   round: 1,
   isRunning: false,
   winner: null,
-});
+})
